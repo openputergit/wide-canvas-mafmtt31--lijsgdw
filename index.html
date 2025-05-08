@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GeoPin Reminder</title>
+    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&libraries=places"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: #f0f2f5;
+        }
+        
+        .neumorph {
+            background: #f0f2f5;
+            box-shadow: 5px 5px 10px #d1d9e6, -5px -5px 10px #ffffff;
+            border-radius: 20px;
+        }
+        
+        .neumorph-inset {
+            background: #f0f2f5;
+            box-shadow: inset 5px 5px 10px #d1d9e6, inset -5px -5px 10px #ffffff;
+            border-radius: 20px;
+        }
+        
+        #map {
+            height: 300px;
+            width: 100%;
+            border-radius: 20px;
+        }
+        
+        .reminder-card {
+            transition: transform 0.2s;
+        }
+        
+        .reminder-card:hover {
+            transform: translateY(-5px);
+        }
+    </style>
+</head>
+<body>
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="neumorph p-6 mb-8">
+            <h1 class="text-3xl font-bold text-gray-800">GeoPin Reminder</h1>
+            <p class="text-gray-600 mt-2">Location-based reminders at your fingertips</p>
+        </div>
+
+        <!-- Map Section -->
+        <div class="neumorph p-6 mb-8">
+            <div id="map" class="mb-4"></div>
+            <button onclick="addNewReminder()" class="bg-blue-500 text-white px-6 py-2 rounded-full neumorph hover:bg-blue-600">
+                <i class="bi bi-plus-lg mr-2"></i>Add New Reminder
+            </button>
+        </div>
+
+        <!-- Reminders List -->
+        <div class="neumorph p-6">
+            <h2 class="text-2xl font-bold mb-4 text-gray-800">My Reminders</h2>
+            <div id="remindersList" class="space-y-4">
+                <!-- Reminders will be dynamically added here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Reminder Modal -->
+    <div id="reminderModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center">
+        <div class="neumorph bg-white p-6 rounded-2xl w-96">
+            <h3 class="text-xl font-bold mb-4">Add New Reminder</h3>
+            <input type="text" id="reminderTitle" placeholder="Reminder Title" class="neumorph-inset w-full p-3 mb-4">
+            <textarea id="reminderDesc" placeholder="Description" class="neumorph-inset w-full p-3 mb-4 h-24"></textarea>
+            <div class="flex justify-end space-x-4">
+                <button onclick="closeModal()" class="px-4 py-2 text-gray-600 neumorph hover:bg-gray-100">Cancel</button>
+                <button onclick="saveReminder()" class="px-4 py-2 bg-blue-500 text-white rounded-lg neumorph hover:bg-blue-600">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let map;
+        let markers = [];
+        let reminders = [];
+
+        // Initialize Google Maps
+        function initMap() {
+            map = new google.maps.Map(document.getElementById('map'), {
+                center: { lat: -34.397, lng: 150.644 },
+                zoom: 8
+            });
+
+            // Get user's location
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(position => {
+                    const pos = {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude
+                    };
+                    map.setCenter(pos);
+                });
+            }
+
+            // Add click listener to map
+            map.addListener('click', (e) => {
+                placeMarker(e.latLng);
+            });
+        }
+
+        function placeMarker(location) {
+            clearMarkers();
+            const marker = new google.maps.Marker({
+                position: location,
+                map: map
+            });
+            markers.push(marker);
+        }
+
+        function clearMarkers() {
+            markers.forEach(marker => marker.setMap(null));
+            markers = [];
+        }
+
+        function addNewReminder() {
+            if (markers.length === 0) {
+                alert('Please select a location on the map first');
+                return;
+            }
+            document.getElementById('reminderModal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('reminderModal').classList.add('hidden');
+        }
+
+        function saveReminder() {
+            const title = document.getElementById('reminderTitle').value;
+            const desc = document.getElementById('reminderDesc').value;
+            
+            if (!title) {
+                alert('Please enter a title');
+                return;
+            }
+
+            const reminder = {
+                id: Date.now(),
+                title,
+                description: desc,
+                location: markers[0].getPosition().toJSON()
+            };
+
+            reminders.push(reminder);
+            updateRemindersList();
+            closeModal();
+            clearMarkers();
+
+            // Reset form
+            document.getElementById('reminderTitle').value = '';
+            document.getElementById('reminderDesc').value = '';
+        }
+
+        function updateRemindersList() {
+            const list = document.getElementById('remindersList');
+            list.innerHTML = '';
+
+            reminders.forEach(reminder => {
+                const card = document.createElement('div');
+                card.className = 'reminder-card neumorph p-4';
+                card.innerHTML = `
+                    <h3 class="text-lg font-bold">${reminder.title}</h3>
+                    <p class="text-gray-600 mt-2">${reminder.description}</p>
+                    <div class="flex justify-between mt-4">
+                        <span class="text-sm text-gray-500">
+                            <i class="bi bi-geo-alt"></i> 
+                            Lat: ${reminder.location.lat.toFixed(4)}, Lng: ${reminder.location.lng.toFixed(4)}
+                        </span>
+                        <button onclick="deleteReminder(${reminder.id})" class="text-red-500">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                `;
+                list.appendChild(card);
+            });
+        }
+
+        function deleteReminder(id) {
+            reminders = reminders.filter(r => r.id !== id);
+            updateRemindersList();
+        }
+
+        // Initialize map when page loads
+        window.onload = initMap;
+    </script>
+<script>document.body.addEventListener('wheel', e => { if (!e.ctrlKey) return; e.preventDefault(); return }, { passive: false })</script>
+	</body>
+</html>
